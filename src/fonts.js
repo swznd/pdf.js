@@ -2,6 +2,7 @@
 /* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
 
 'use strict';
+
 var isWorker = (typeof window == 'undefined');
 
 /**
@@ -11,6 +12,7 @@ var kMaxWaitForFontFace = 1000;
 
 // Unicode Private Use Area
 var kCmapGlyphOffset = 0xE000;
+var kSizeOfGlyphArea = 0x1900;
 
 // PDF Glyph Space Units are one Thousandth of a TextSpace Unit
 // except for Type 3 fonts
@@ -19,59 +21,324 @@ var kPDFGlyphSpaceUnits = 1000;
 // Until hinting is fully supported this constant can be used
 var kHintingEnabled = false;
 
+var Encodings = {
+  get ExpertEncoding() {
+    return shadow(this, 'ExpertEncoding', ['', '', '', '', '', '', '', '', '',
+      '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '',
+      '', '', '', '', '', 'space', 'exclamsmall', 'Hungarumlautsmall', '',
+      'dollaroldstyle', 'dollarsuperior', 'ampersandsmall', 'Acutesmall',
+      'parenleftsuperior', 'parenrightsuperior', 'twodotenleader',
+      'onedotenleader', 'comma', 'hyphen', 'period', 'fraction',
+      'zerooldstyle', 'oneoldstyle', 'twooldstyle', 'threeoldstyle',
+      'fouroldstyle', 'fiveoldstyle', 'sixoldstyle', 'sevenoldstyle',
+      'eightoldstyle', 'nineoldstyle', 'colon', 'semicolon', 'commasuperior',
+      'threequartersemdash', 'periodsuperior', 'questionsmall', '',
+      'asuperior', 'bsuperior', 'centsuperior', 'dsuperior', 'esuperior', '',
+      '', 'isuperior', '', '', 'lsuperior', 'msuperior', 'nsuperior',
+      'osuperior', '', '', 'rsuperior', 'ssuperior', 'tsuperior', '', 'ff',
+      'fi', 'fl', 'ffi', 'ffl', 'parenleftinferior', '', 'parenrightinferior',
+      'Circumflexsmall', 'hyphensuperior', 'Gravesmall', 'Asmall', 'Bsmall',
+      'Csmall', 'Dsmall', 'Esmall', 'Fsmall', 'Gsmall', 'Hsmall', 'Ismall',
+      'Jsmall', 'Ksmall', 'Lsmall', 'Msmall', 'Nsmall', 'Osmall', 'Psmall',
+      'Qsmall', 'Rsmall', 'Ssmall', 'Tsmall', 'Usmall', 'Vsmall', 'Wsmall',
+      'Xsmall', 'Ysmall', 'Zsmall', 'colonmonetary', 'onefitted', 'rupiah',
+      'Tildesmall', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '',
+      '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '',
+      '', 'exclamdownsmall', 'centoldstyle', 'Lslashsmall', '', '',
+      'Scaronsmall', 'Zcaronsmall', 'Dieresissmall', 'Brevesmall',
+      'Caronsmall', '', 'Dotaccentsmall', '', '', 'Macronsmall', '', '',
+      'figuredash', 'hypheninferior', '', '', 'Ogoneksmall', 'Ringsmall',
+      'Cedillasmall', '', '', '', 'onequarter', 'onehalf', 'threequarters',
+      'questiondownsmall', 'oneeighth', 'threeeighths', 'fiveeighths',
+      'seveneighths', 'onethird', 'twothirds', '', '', 'zerosuperior',
+      'onesuperior', 'twosuperior', 'threesuperior', 'foursuperior',
+      'fivesuperior', 'sixsuperior', 'sevensuperior', 'eightsuperior',
+      'ninesuperior', 'zeroinferior', 'oneinferior', 'twoinferior',
+      'threeinferior', 'fourinferior', 'fiveinferior', 'sixinferior',
+      'seveninferior', 'eightinferior', 'nineinferior', 'centinferior',
+      'dollarinferior', 'periodinferior', 'commainferior', 'Agravesmall',
+      'Aacutesmall', 'Acircumflexsmall', 'Atildesmall', 'Adieresissmall',
+      'Aringsmall', 'AEsmall', 'Ccedillasmall', 'Egravesmall', 'Eacutesmall',
+      'Ecircumflexsmall', 'Edieresissmall', 'Igravesmall', 'Iacutesmall',
+      'Icircumflexsmall', 'Idieresissmall', 'Ethsmall', 'Ntildesmall',
+      'Ogravesmall', 'Oacutesmall', 'Ocircumflexsmall', 'Otildesmall',
+      'Odieresissmall', 'OEsmall', 'Oslashsmall', 'Ugravesmall', 'Uacutesmall',
+      'Ucircumflexsmall', 'Udieresissmall', 'Yacutesmall', 'Thornsmall',
+      'Ydieresissmall'
+    ]);
+  },
+  get MacExpertEncoding() {
+    return shadow(this, 'MacExpertEncoding', ['', '', '', '', '', '', '', '',
+      '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '',
+      '', '', '', '', '', '', 'space', 'exclamsmall', 'Hungarumlautsmall',
+      'centoldstyle', 'dollaroldstyle', 'dollarsuperior', 'ampersandsmall',
+      'Acutesmall', 'parenleftsuperior', 'parenrightsuperior',
+      'twodotenleader', 'onedotenleader', 'comma', 'hyphen', 'period',
+      'fraction', 'zerooldstyle', 'oneoldstyle', 'twooldstyle',
+      'threeoldstyle', 'fouroldstyle', 'fiveoldstyle', 'sixoldstyle',
+      'sevenoldstyle', 'eightoldstyle', 'nineoldstyle', 'colon', 'semicolon',
+      '', 'threequartersemdash', '', 'questionsmall', '', '', '', '',
+      'Ethsmall', '', '', 'onequarter', 'onehalf', 'threequarters',
+      'oneeighth', 'threeeighths', 'fiveeighths', 'seveneighths', 'onethird',
+      'twothirds', '', '', '', '', '', '', 'ff', 'fi', 'fl', 'ffi', 'ffl',
+      'parenleftinferior', '', 'parenrightinferior', 'Circumflexsmall',
+      'hypheninferior', 'Gravesmall', 'Asmall', 'Bsmall', 'Csmall', 'Dsmall',
+      'Esmall', 'Fsmall', 'Gsmall', 'Hsmall', 'Ismall', 'Jsmall', 'Ksmall',
+      'Lsmall', 'Msmall', 'Nsmall', 'Osmall', 'Psmall', 'Qsmall', 'Rsmall',
+      'Ssmall', 'Tsmall', 'Usmall', 'Vsmall', 'Wsmall', 'Xsmall', 'Ysmall',
+      'Zsmall', 'colonmonetary', 'onefitted', 'rupiah', 'Tildesmall', '', '',
+      'asuperior', 'centsuperior', '', '', '', '', 'Aacutesmall',
+      'Agravesmall', 'Acircumflexsmall', 'Adieresissmall', 'Atildesmall',
+      'Aringsmall', 'Ccedillasmall', 'Eacutesmall', 'Egravesmall',
+      'Ecircumflexsmall', 'Edieresissmall', 'Iacutesmall', 'Igravesmall',
+      'Icircumflexsmall', 'Idieresissmall', 'Ntildesmall', 'Oacutesmall',
+      'Ogravesmall', 'Ocircumflexsmall', 'Odieresissmall', 'Otildesmall',
+      'Uacutesmall', 'Ugravesmall', 'Ucircumflexsmall', 'Udieresissmall', '',
+      'eightsuperior', 'fourinferior', 'threeinferior', 'sixinferior',
+      'eightinferior', 'seveninferior', 'Scaronsmall', '', 'centinferior',
+      'twoinferior', '', 'Dieresissmall', '', 'Caronsmall', 'osuperior',
+      'fiveinferior', '', 'commainferior', 'periodinferior', 'Yacutesmall', '',
+      'dollarinferior', '', 'Thornsmall', '', 'nineinferior', 'zeroinferior',
+      'Zcaronsmall', 'AEsmall', 'Oslashsmall', 'questiondownsmall',
+      'oneinferior', 'Lslashsmall', '', '', '', '', '', '', 'Cedillasmall', '',
+      '', '', '', '', 'OEsmall', 'figuredash', 'hyphensuperior', '', '', '',
+      '', 'exclamdownsmall', '', 'Ydieresissmall', '', 'onesuperior',
+      'twosuperior', 'threesuperior', 'foursuperior', 'fivesuperior',
+      'sixsuperior', 'sevensuperior', 'ninesuperior', 'zerosuperior', '',
+      'esuperior', 'rsuperior', 'tsuperior', '', '', 'isuperior', 'ssuperior',
+      'dsuperior', '', '', '', '', '', 'lsuperior', 'Ogoneksmall',
+      'Brevesmall', 'Macronsmall', 'bsuperior', 'nsuperior', 'msuperior',
+      'commasuperior', 'periodsuperior', 'Dotaccentsmall', 'Ringsmall'
+    ]);
+  },
+  get MacRomanEncoding() {
+    return shadow(this, 'MacRomanEncoding', ['', '', '', '', '', '', '', '',
+      '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '',
+      '', '', '', '', '', '', 'space', 'exclam', 'quotedbl', 'numbersign',
+      'dollar', 'percent', 'ampersand', 'quotesingle', 'parenleft',
+      'parenright', 'asterisk', 'plus', 'comma', 'hyphen', 'period', 'slash',
+      'zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight',
+      'nine', 'colon', 'semicolon', 'less', 'equal', 'greater', 'question',
+      'at', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+      'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+      'bracketleft', 'backslash', 'bracketright', 'asciicircum', 'underscore',
+      'grave', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+      'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+      'braceleft', 'bar', 'braceright', 'asciitilde', '', 'Adieresis', 'Aring',
+      'Ccedilla', 'Eacute', 'Ntilde', 'Odieresis', 'Udieresis', 'aacute',
+      'agrave', 'acircumflex', 'adieresis', 'atilde', 'aring', 'ccedilla',
+      'eacute', 'egrave', 'ecircumflex', 'edieresis', 'iacute', 'igrave',
+      'icircumflex', 'idieresis', 'ntilde', 'oacute', 'ograve', 'ocircumflex',
+      'odieresis', 'otilde', 'uacute', 'ugrave', 'ucircumflex', 'udieresis',
+      'dagger', 'degree', 'cent', 'sterling', 'section', 'bullet', 'paragraph',
+      'germandbls', 'registered', 'copyright', 'trademark', 'acute',
+      'dieresis', 'notequal', 'AE', 'Oslash', 'infinity', 'plusminus',
+      'lessequal', 'greaterequal', 'yen', 'mu', 'partialdiff', 'summation',
+      'product', 'pi', 'integral', 'ordfeminine', 'ordmasculine', 'Omega',
+      'ae', 'oslash', 'questiondown', 'exclamdown', 'logicalnot', 'radical',
+      'florin', 'approxequal', 'Delta', 'guillemotleft', 'guillemotright',
+      'ellipsis', 'space', 'Agrave', 'Atilde', 'Otilde', 'OE', 'oe', 'endash',
+      'emdash', 'quotedblleft', 'quotedblright', 'quoteleft', 'quoteright',
+      'divide', 'lozenge', 'ydieresis', 'Ydieresis', 'fraction', 'currency',
+      'guilsinglleft', 'guilsinglright', 'fi', 'fl', 'daggerdbl',
+      'periodcentered', 'quotesinglbase', 'quotedblbase', 'perthousand',
+      'Acircumflex', 'Ecircumflex', 'Aacute', 'Edieresis', 'Egrave', 'Iacute',
+      'Icircumflex', 'Idieresis', 'Igrave', 'Oacute', 'Ocircumflex', 'apple',
+      'Ograve', 'Uacute', 'Ucircumflex', 'Ugrave', 'dotlessi', 'circumflex',
+      'tilde', 'macron', 'breve', 'dotaccent', 'ring', 'cedilla',
+      'hungarumlaut', 'ogonek', 'caron'
+    ]);
+  },
+  get StandardEncoding() {
+    return shadow(this, 'StandardEncoding', ['', '', '', '', '', '', '', '',
+      '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '',
+      '', '', '', '', '', '', 'space', 'exclam', 'quotedbl', 'numbersign',
+      'dollar', 'percent', 'ampersand', 'quoteright', 'parenleft',
+      'parenright', 'asterisk', 'plus', 'comma', 'hyphen', 'period', 'slash',
+      'zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight',
+      'nine', 'colon', 'semicolon', 'less', 'equal', 'greater', 'question',
+      'at', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+      'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+      'bracketleft', 'backslash', 'bracketright', 'asciicircum', 'underscore',
+      'quoteleft', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l',
+      'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+      'braceleft', 'bar', 'braceright', 'asciitilde', '', '', 'exclamdown',
+      'cent', 'sterling', 'fraction', 'yen', 'florin', 'section', 'currency',
+      'quotesingle', 'quotedblleft', 'guillemotleft', 'guilsinglleft',
+      'guilsinglright', 'fi', 'fl', '', 'endash', 'dagger', 'daggerdbl',
+      'periodcentered', '', 'paragraph', 'bullet', 'quotesinglbase',
+      'quotedblbase', 'quotedblright', 'guillemotright', 'ellipsis',
+      'perthousand', '', 'questiondown', '', 'grave', 'acute', 'circumflex',
+      'tilde', 'macron', 'breve', 'dotaccent', 'dieresis', '', 'ring',
+      'cedilla', '', 'hungarumlaut', 'ogonek', 'caron', 'emdash', '', '', '',
+      '', '', '', '', '', '', '', '', '', '', '', '', '', 'AE', '',
+      'ordfeminine', '', '', '', '', 'Lslash', 'Oslash', 'OE', 'ordmasculine',
+      '', '', '', '', '', 'ae', '', '', '', 'dotlessi', '', '', 'lslash',
+      'oslash', 'oe', 'germandbls'
+    ]);
+  },
+  get WinAnsiEncoding() {
+    return shadow(this, 'WinAnsiEncoding', ['', '', '', '', '', '', '', '', '',
+      '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '',
+      '', '', '', '', '', 'space', 'exclam', 'quotedbl', 'numbersign',
+      'dollar', 'percent', 'ampersand', 'quotesingle', 'parenleft',
+      'parenright', 'asterisk', 'plus', 'comma', 'hyphen', 'period', 'slash',
+      'zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight',
+      'nine', 'colon', 'semicolon', 'less', 'equal', 'greater', 'question',
+      'at', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+      'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+      'bracketleft', 'backslash', 'bracketright', 'asciicircum', 'underscore',
+      'grave', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+      'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+      'braceleft', 'bar', 'braceright', 'asciitilde', 'bullet', 'Euro',
+      'bullet', 'quotesinglbase', 'florin', 'quotedblbase', 'ellipsis',
+      'dagger', 'daggerdbl', 'circumflex', 'perthousand', 'Scaron',
+      'guilsinglleft', 'OE', 'bullet', 'Zcaron', 'bullet', 'bullet',
+      'quoteleft', 'quoteright', 'quotedblleft', 'quotedblright', 'bullet',
+      'endash', 'emdash', 'tilde', 'trademark', 'scaron', 'guilsinglright',
+      'oe', 'bullet', 'zcaron', 'Ydieresis', 'space', 'exclamdown', 'cent',
+      'sterling', 'currency', 'yen', 'brokenbar', 'section', 'dieresis',
+      'copyright', 'ordfeminine', 'guillemotleft', 'logicalnot', 'hyphen',
+      'registered', 'macron', 'degree', 'plusminus', 'twosuperior',
+      'threesuperior', 'acute', 'mu', 'paragraph', 'periodcentered',
+      'cedilla', 'onesuperior', 'ordmasculine', 'guillemotright', 'onequarter',
+      'onehalf', 'threequarters', 'questiondown', 'Agrave', 'Aacute',
+      'Acircumflex', 'Atilde', 'Adieresis', 'Aring', 'AE', 'Ccedilla',
+      'Egrave', 'Eacute', 'Ecircumflex', 'Edieresis', 'Igrave', 'Iacute',
+      'Icircumflex', 'Idieresis', 'Eth', 'Ntilde', 'Ograve', 'Oacute',
+      'Ocircumflex', 'Otilde', 'Odieresis', 'multiply', 'Oslash', 'Ugrave',
+      'Uacute', 'Ucircumflex', 'Udieresis', 'Yacute', 'Thorn', 'germandbls',
+      'agrave', 'aacute', 'acircumflex', 'atilde', 'adieresis', 'aring', 'ae',
+      'ccedilla', 'egrave', 'eacute', 'ecircumflex', 'edieresis', 'igrave',
+      'iacute', 'icircumflex', 'idieresis', 'eth', 'ntilde', 'ograve',
+      'oacute', 'ocircumflex', 'otilde', 'odieresis', 'divide', 'oslash',
+      'ugrave', 'uacute', 'ucircumflex', 'udieresis', 'yacute', 'thorn',
+      'ydieresis'
+    ]);
+  },
+  get symbolsEncoding() {
+    return shadow(this, 'symbolsEncoding', ['', '', '', '', '', '', '', '', '',
+      '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '',
+      '', '', '', '', '', 'space', 'exclam', 'universal', 'numbersign',
+      'existential', 'percent', 'ampersand', 'suchthat', 'parenleft',
+      'parenright', 'asteriskmath', 'plus', 'comma', 'minus', 'period',
+      'slash', 'zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven',
+      'eight', 'nine', 'colon', 'semicolon', 'less', 'equal', 'greater',
+      'question', 'congruent', 'Alpha', 'Beta', 'Chi', 'Delta', 'Epsilon',
+      'Phi', 'Gamma', 'Eta', 'Iota', 'theta1', 'Kappa', 'Lambda', 'Mu', 'Nu',
+      'Omicron', 'Pi', 'Theta', 'Rho', 'Sigma', 'Tau', 'Upsilon', 'sigma1',
+      'Omega', 'Xi', 'Psi', 'Zeta', 'bracketleft', 'therefore', 'bracketright',
+      'perpendicular', 'underscore', 'radicalex', 'alpha', 'beta', 'chi',
+      'delta', 'epsilon', 'phi', 'gamma', 'eta', 'iota', 'phi1', 'kappa',
+      'lambda', 'mu', 'nu', 'omicron', 'pi', 'theta', 'rho', 'sigma', 'tau',
+      'upsilon', 'omega1', 'omega', 'xi', 'psi', 'zeta', 'braceleft', 'bar',
+      'braceright', 'similar', '', '', '', '', '', '', '', '', '', '', '', '',
+      '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '',
+      '', '', '', 'Euro', 'Upsilon1', 'minute', 'lessequal', 'fraction',
+      'infinity', 'florin', 'club', 'diamond', 'heart', 'spade', 'arrowboth',
+      'arrowleft', 'arrowup', 'arrowright', 'arrowdown', 'degree', 'plusminus',
+      'second', 'greaterequal', 'multiply', 'proportional', 'partialdiff',
+      'bullet', 'divide', 'notequal', 'equivalence', 'approxequal', 'ellipsis',
+      'arrowvertex', 'arrowhorizex', 'carriagereturn', 'aleph', 'Ifraktur',
+      'Rfraktur', 'weierstrass', 'circlemultiply', 'circleplus', 'emptyset',
+      'intersection', 'union', 'propersuperset', 'reflexsuperset', 'notsubset',
+      'propersubset', 'reflexsubset', 'element', 'notelement', 'angle',
+      'gradient', 'registerserif', 'copyrightserif', 'trademarkserif',
+      'product', 'radical', 'dotmath', 'logicalnot', 'logicaland', 'logicalor',
+      'arrowdblboth', 'arrowdblleft', 'arrowdblup', 'arrowdblright',
+      'arrowdbldown', 'lozenge', 'angleleft', 'registersans', 'copyrightsans',
+      'trademarksans', 'summation', 'parenlefttp', 'parenleftex',
+      'parenleftbt', 'bracketlefttp', 'bracketleftex', 'bracketleftbt',
+      'bracelefttp', 'braceleftmid', 'braceleftbt', 'braceex', '',
+      'angleright', 'integral', 'integraltp', 'integralex', 'integralbt',
+      'parenrighttp', 'parenrightex', 'parenrightbt', 'bracketrighttp',
+      'bracketrightex', 'bracketrightbt', 'bracerighttp', 'bracerightmid',
+      'bracerightbt'
+    ]);
+  },
+  get zapfDingbatsEncoding() {
+    return shadow(this, 'zapfDingbatsEncoding', ['', '', '', '', '', '', '',
+      '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '',
+      '', '', '', '', '', '', '', 'space', 'a1', 'a2', 'a202', 'a3', 'a4',
+      'a5', 'a119', 'a118', 'a117', 'a11', 'a12', 'a13', 'a14', 'a15', 'a16',
+      'a105', 'a17', 'a18', 'a19', 'a20', 'a21', 'a22', 'a23', 'a24', 'a25',
+      'a26', 'a27', 'a28', 'a6', 'a7', 'a8', 'a9', 'a10', 'a29', 'a30', 'a31',
+      'a32', 'a33', 'a34', 'a35', 'a36', 'a37', 'a38', 'a39', 'a40', 'a41',
+      'a42', 'a43', 'a44', 'a45', 'a46', 'a47', 'a48', 'a49', 'a50', 'a51',
+      'a52', 'a53', 'a54', 'a55', 'a56', 'a57', 'a58', 'a59', 'a60', 'a61',
+      'a62', 'a63', 'a64', 'a65', 'a66', 'a67', 'a68', 'a69', 'a70', 'a71',
+      'a72', 'a73', 'a74', 'a203', 'a75', 'a204', 'a76', 'a77', 'a78', 'a79',
+      'a81', 'a82', 'a83', 'a84', 'a97', 'a98', 'a99', 'a100', '', '', '', '',
+      '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '',
+      '', '', '', '', '', '', '', '', '', '', '', '', 'a101', 'a102', 'a103',
+      'a104', 'a106', 'a107', 'a108', 'a112', 'a111', 'a110', 'a109', 'a120',
+      'a121', 'a122', 'a123', 'a124', 'a125', 'a126', 'a127', 'a128', 'a129',
+      'a130', 'a131', 'a132', 'a133', 'a134', 'a135', 'a136', 'a137', 'a138',
+      'a139', 'a140', 'a141', 'a142', 'a143', 'a144', 'a145', 'a146', 'a147',
+      'a148', 'a149', 'a150', 'a151', 'a152', 'a153', 'a154', 'a155', 'a156',
+      'a157', 'a158', 'a159', 'a160', 'a161', 'a163', 'a164', 'a196', 'a165',
+      'a192', 'a166', 'a167', 'a168', 'a169', 'a170', 'a171', 'a172', 'a173',
+      'a162', 'a174', 'a175', 'a176', 'a177', 'a178', 'a179', 'a193', 'a180',
+      'a199', 'a181', 'a200', 'a182', '', 'a201', 'a183', 'a184', 'a197',
+      'a185', 'a194', 'a198', 'a186', 'a195', 'a187', 'a188', 'a189', 'a190',
+      'a191'
+    ]);
+  }
+};
+
 /**
  * Hold a map of decoded fonts and of the standard fourteen Type1
  * fonts and their acronyms.
  */
 var stdFontMap = {
   'ArialNarrow': 'Helvetica',
-  'ArialNarrow_Bold': 'Helvetica-Bold',
-  'ArialNarrow_BoldItalic': 'Helvetica-BoldOblique',
-  'ArialNarrow_Italic': 'Helvetica-Oblique',
+  'ArialNarrow-Bold': 'Helvetica-Bold',
+  'ArialNarrow-BoldItalic': 'Helvetica-BoldOblique',
+  'ArialNarrow-Italic': 'Helvetica-Oblique',
   'ArialBlack': 'Helvetica',
-  'ArialBlack_Bold': 'Helvetica-Bold',
-  'ArialBlack_BoldItalic': 'Helvetica-BoldOblique',
-  'ArialBlack_Italic': 'Helvetica-Oblique',
+  'ArialBlack-Bold': 'Helvetica-Bold',
+  'ArialBlack-BoldItalic': 'Helvetica-BoldOblique',
+  'ArialBlack-Italic': 'Helvetica-Oblique',
   'Arial': 'Helvetica',
-  'Arial_Bold': 'Helvetica-Bold',
-  'Arial_BoldItalic': 'Helvetica-BoldOblique',
-  'Arial_Italic': 'Helvetica-Oblique',
-  'Arial_BoldItalicMT': 'Helvetica-BoldOblique',
-  'Arial_BoldMT': 'Helvetica-Bold',
-  'Arial_ItalicMT': 'Helvetica-Oblique',
+  'Arial-Bold': 'Helvetica-Bold',
+  'Arial-BoldItalic': 'Helvetica-BoldOblique',
+  'Arial-Italic': 'Helvetica-Oblique',
+  'Arial-BoldItalicMT': 'Helvetica-BoldOblique',
+  'Arial-BoldMT': 'Helvetica-Bold',
+  'Arial-ItalicMT': 'Helvetica-Oblique',
   'ArialMT': 'Helvetica',
-  'Courier_Bold': 'Courier-Bold',
-  'Courier_BoldItalic': 'Courier-BoldOblique',
-  'Courier_Italic': 'Courier-Oblique',
+  'Courier-Bold': 'Courier-Bold',
+  'Courier-BoldItalic': 'Courier-BoldOblique',
+  'Courier-Italic': 'Courier-Oblique',
   'CourierNew': 'Courier',
-  'CourierNew_Bold': 'Courier-Bold',
-  'CourierNew_BoldItalic': 'Courier-BoldOblique',
-  'CourierNew_Italic': 'Courier-Oblique',
-  'CourierNewPS_BoldItalicMT': 'Courier-BoldOblique',
-  'CourierNewPS_BoldMT': 'Courier-Bold',
-  'CourierNewPS_ItalicMT': 'Courier-Oblique',
+  'CourierNew-Bold': 'Courier-Bold',
+  'CourierNew-BoldItalic': 'Courier-BoldOblique',
+  'CourierNew-Italic': 'Courier-Oblique',
+  'CourierNewPS-BoldItalicMT': 'Courier-BoldOblique',
+  'CourierNewPS-BoldMT': 'Courier-Bold',
+  'CourierNewPS-ItalicMT': 'Courier-Oblique',
   'CourierNewPSMT': 'Courier',
-  'Helvetica_Bold': 'Helvetica-Bold',
-  'Helvetica_BoldItalic': 'Helvetica-BoldOblique',
-  'Helvetica_Italic': 'Helvetica-Oblique',
-  'Symbol_Bold': 'Symbol',
-  'Symbol_BoldItalic': 'Symbol',
-  'Symbol_Italic': 'Symbol',
+  'Helvetica-Bold': 'Helvetica-Bold',
+  'Helvetica-BoldItalic': 'Helvetica-BoldOblique',
+  'Helvetica-Italic': 'Helvetica-Oblique',
+  'Symbol-Bold': 'Symbol',
+  'Symbol-BoldItalic': 'Symbol',
+  'Symbol-Italic': 'Symbol',
   'TimesNewRoman': 'Times-Roman',
-  'TimesNewRoman_Bold': 'Times-Bold',
-  'TimesNewRoman_BoldItalic': 'Times-BoldItalic',
-  'TimesNewRoman_Italic': 'Times-Italic',
+  'TimesNewRoman-Bold': 'Times-Bold',
+  'TimesNewRoman-BoldItalic': 'Times-BoldItalic',
+  'TimesNewRoman-Italic': 'Times-Italic',
   'TimesNewRomanPS': 'Times-Roman',
-  'TimesNewRomanPS_Bold': 'Times-Bold',
-  'TimesNewRomanPS_BoldItalic': 'Times-BoldItalic',
-  'TimesNewRomanPS_BoldItalicMT': 'Times-BoldItalic',
-  'TimesNewRomanPS_BoldMT': 'Times-Bold',
-  'TimesNewRomanPS_Italic': 'Times-Italic',
-  'TimesNewRomanPS_ItalicMT': 'Times-Italic',
+  'TimesNewRomanPS-Bold': 'Times-Bold',
+  'TimesNewRomanPS-BoldItalic': 'Times-BoldItalic',
+  'TimesNewRomanPS-BoldItalicMT': 'Times-BoldItalic',
+  'TimesNewRomanPS-BoldMT': 'Times-Bold',
+  'TimesNewRomanPS-Italic': 'Times-Italic',
+  'TimesNewRomanPS-ItalicMT': 'Times-Italic',
   'TimesNewRomanPSMT': 'Times-Roman',
-  'TimesNewRomanPSMT_Bold': 'Times-Bold',
-  'TimesNewRomanPSMT_BoldItalic': 'Times-BoldItalic',
-  'TimesNewRomanPSMT_Italic': 'Times-Italic'
+  'TimesNewRomanPSMT-Bold': 'Times-Bold',
+  'TimesNewRomanPSMT-BoldItalic': 'Times-BoldItalic',
+  'TimesNewRomanPSMT-Italic': 'Times-Italic'
 };
 
 var serifFonts = {
@@ -126,7 +393,7 @@ var FontLoader = {
 
   bind: function fontLoaderBind(fonts, callback) {
     function checkFontsLoaded() {
-      for (var i = 0; i < objs.length; i++) {
+      for (var i = 0, ii = objs.length; i < ii; i++) {
         var fontObj = objs[i];
         if (fontObj.loading) {
           return false;
@@ -142,10 +409,22 @@ var FontLoader = {
 
     var rules = [], names = [], objs = [];
 
-    for (var i = 0; i < fonts.length; i++) {
+    for (var i = 0, ii = fonts.length; i < ii; i++) {
       var font = fonts[i];
 
+      // If there is already a fontObj on the font, then it was loaded/attached
+      // to the page already and we don't have to do anything for this font
+      // here future.
+      if (font.fontObj) {
+        continue;
+      }
+
       var obj = new Font(font.name, font.file, font.properties);
+
+      // Store the fontObj on the font such that `setFont` in CanvasGraphics
+      // can reuse it later again.
+      font.fontObj = obj;
+
       objs.push(obj);
 
       var str = '';
@@ -211,7 +490,7 @@ var FontLoader = {
                        'width: 10px; height: 10px;' +
                        'position: absolute; top: 0px; left: 0px;');
       var html = '';
-      for (var i = 0; i < names.length; ++i) {
+      for (var i = 0, ii = names.length; i < ii; ++i) {
         html += '<span style="font-family:' + names[i] + '">Hi</span>';
       }
       div.innerHTML = html;
@@ -222,7 +501,7 @@ var FontLoader = {
           'message',
           function fontLoaderMessage(e) {
             var fontNames = JSON.parse(e.data);
-            for (var i = 0; i < objs.length; ++i) {
+            for (var i = 0, ii = objs.length; i < ii; ++i) {
               var font = objs[i];
               font.loading = false;
             }
@@ -238,13 +517,13 @@ var FontLoader = {
       // pdfjsFontLoadFailed?
       var src = '<!DOCTYPE HTML><html><head>';
       src += '<style type="text/css">';
-      for (var i = 0; i < rules.length; ++i) {
+      for (var i = 0, ii = rules.length; i < ii; ++i) {
         src += rules[i];
       }
       src += '</style>';
       src += '<script type="application/javascript">';
       var fontNamesArray = '';
-      for (var i = 0; i < names.length; ++i) {
+      for (var i = 0, ii = names.length; i < ii; ++i) {
         fontNamesArray += '"' + names[i] + '", ';
       }
       src += '  var fontNames=[' + fontNamesArray + '];\n';
@@ -252,7 +531,7 @@ var FontLoader = {
       src += '    parent.postMessage(JSON.stringify(fontNames), "*");\n';
       src += '  }';
       src += '</script></head><body>';
-      for (var i = 0; i < names.length; ++i) {
+      for (var i = 0, ii = names.length; i < ii; ++i) {
         src += '<p style="font-family:\'' + names[i] + '\'">Hi</p>';
       }
       src += '</body></html>';
@@ -394,7 +673,7 @@ var UnicodeRanges = [
 ];
 
 function getUnicodeRangeFor(value) {
-  for (var i = 0; i < UnicodeRanges.length; i++) {
+  for (var i = 0, ii = UnicodeRanges.length; i < ii; i++) {
     var range = UnicodeRanges[i];
     if (value >= range.begin && value < range.end)
       return i;
@@ -440,7 +719,9 @@ var Font = (function Font() {
     if (!file) {
       // The file data is not specified. Trying to fix the font name
       // to be used with the canvas.font.
-      var fontName = stdFontMap[name] || name.replace('_', '-');
+      var fontName = name.replace(/[,_]/g, '-');
+      fontName = stdFontMap[fontName] || fontName;
+
       this.bold = (fontName.search(/bold/gi) != -1);
       this.italic = (fontName.search(/oblique/gi) != -1) ||
                     (fontName.search(/italic/gi) != -1);
@@ -501,7 +782,7 @@ var Font = (function Font() {
 
   function stringToArray(str) {
     var array = [];
-    for (var i = 0; i < str.length; ++i)
+    for (var i = 0, ii = str.length; i < ii; ++i)
       array[i] = str.charCodeAt(i);
 
     return array;
@@ -509,7 +790,7 @@ var Font = (function Font() {
 
   function arrayToString(arr) {
     var str = '';
-    for (var i = 0; i < arr.length; ++i)
+    for (var i = 0, ii = arr.length; i < ii; ++i)
       str += String.fromCharCode(arr[i]);
 
     return str;
@@ -707,7 +988,13 @@ var Font = (function Font() {
   };
 
   function createOS2Table(properties, override) {
-    var override = override || {};
+    override = override || {
+      unitsPerEm: 0,
+      yMax: 0,
+      yMin: 0,
+      ascent: 0,
+      descent: 0
+    };
 
     var ulUnicodeRange1 = 0;
     var ulUnicodeRange2 = 0;
@@ -829,11 +1116,11 @@ var Font = (function Font() {
     // Mac want 1-byte per character strings while Windows want
     // 2-bytes per character, so duplicate the names table
     var stringsUnicode = [];
-    for (var i = 0; i < strings.length; i++) {
+    for (var i = 0, ii = strings.length; i < ii; i++) {
       var str = strings[i];
 
       var strUnicode = '';
-      for (var j = 0; j < str.length; j++)
+      for (var j = 0, jj = str.length; j < jj; j++)
         strUnicode += string16(str.charCodeAt(j));
       stringsUnicode.push(strUnicode);
     }
@@ -851,9 +1138,9 @@ var Font = (function Font() {
 
     // Build the name records field
     var strOffset = 0;
-    for (var i = 0; i < platforms.length; i++) {
+    for (var i = 0, ii = platforms.length; i < ii; i++) {
       var strs = names[i];
-      for (var j = 0; j < strs.length; j++) {
+      for (var j = 0, jj = strs.length; j < jj; j++) {
         var str = strs[j];
         var nameRecord =
           platforms[i] + // platform ID
@@ -971,7 +1258,7 @@ var Font = (function Font() {
                     string32(table.offset);
           }
 
-          for (var i = 0; i < data.length; i++)
+          for (var i = 0, ii = data.length; i < ii; i++)
             cmap.data[i] = data.charCodeAt(i);
         }
 
@@ -1058,7 +1345,7 @@ var Font = (function Font() {
         if (numMissing > 0) {
           font.pos = (font.start ? font.start : 0) + metrics.offset;
           var entries = '';
-          for (var i = 0; i < hmtx.length; i++)
+          for (var i = 0, ii = hmtx.length; i < ii; i++)
             entries += String.fromCharCode(font.getByte());
           for (var i = 0; i < numMissing; i++)
             entries += '\x00\x00';
@@ -1217,18 +1504,21 @@ var Font = (function Font() {
         }
 
         var encoding = properties.encoding, i;
+
+        // offsetting glyphs to avoid problematic unicode ranges
         for (i in encoding) {
           if (encoding.hasOwnProperty(i)) {
             var unicode = encoding[i].unicode;
-            if (unicode <= 0x1f || (unicode >= 127 && unicode <= 255))
-              encoding[i].unicode = unicode += kCmapGlyphOffset;
+            if (unicode <= 0x1f ||
+                (unicode >= 127 && unicode < kSizeOfGlyphArea))
+              encoding[i].unicode += kCmapGlyphOffset;
           }
         }
 
         var glyphs = [];
         for (i = 1; i < numGlyphs; i++) {
           glyphs.push({
-            unicode: i <= 0x1f || (i >= 127 && i <= 255) ?
+            unicode: i <= 0x1f || (i >= 127 && i < kSizeOfGlyphArea) ?
               i + kCmapGlyphOffset : i
           });
         }
@@ -1259,18 +1549,18 @@ var Font = (function Font() {
       });
 
       // rewrite the tables but tweak offsets
-      for (var i = 0; i < tables.length; i++) {
+      for (var i = 0, ii = tables.length; i < ii; i++) {
         var table = tables[i];
         var data = [];
 
         var tableData = table.data;
-        for (var j = 0; j < tableData.length; j++)
+        for (var j = 0, jj = tableData.length; j < jj; j++)
           data.push(tableData[j]);
         createTableEntry(ttf, table.tag, data);
       }
 
       // Add the table datas
-      for (var i = 0; i < tables.length; i++) {
+      for (var i = 0, ii = tables.length; i < ii; i++) {
         var table = tables[i];
         var tableData = table.data;
         ttf.file += arrayToString(tableData);
@@ -1285,7 +1575,7 @@ var Font = (function Font() {
 
     convert: function font_convert(fontName, font, properties) {
       function isFixedPitch(glyphs) {
-        for (var i = 0; i < glyphs.length - 1; i++) {
+        for (var i = 0, ii = glyphs.length - 1; i < ii; i++) {
           if (glyphs[i] != glyphs[i + 1])
             return false;
         }
@@ -1316,7 +1606,8 @@ var Font = (function Font() {
         'OS/2': stringToArray(createOS2Table(properties)),
 
         // Character to glyphs mapping
-        'cmap': createCMapTable(charstrings.slice(), font.glyphIds),
+        'cmap': createCMapTable(charstrings.slice(),
+                                ('glyphIds' in font) ? font.glyphIds : null),
 
         // Font header
         'head': (function fontFieldsHead() {
@@ -1366,7 +1657,7 @@ var Font = (function Font() {
         // Horizontal metrics
         'hmtx': (function fontFieldsHmtx() {
           var hmtx = '\x00\x00\x00\x00'; // Fake .notdef
-          for (var i = 0; i < charstrings.length; i++) {
+          for (var i = 0, ii = charstrings.length; i < ii; i++) {
             hmtx += string16(charstrings[i].width) + string16(0);
           }
           return stringToArray(hmtx);
@@ -1438,8 +1729,8 @@ var Font = (function Font() {
       }
 
       encoding[0] = { unicode: 0, width: 0 };
-      var glyph = 1, i, j, k;
-      for (i = 0; i < cidToUnicode.length; ++i) {
+      var glyph = 1, i, j, k, cidLength, ii;
+      for (i = 0, ii = cidToUnicode.length; i < ii; ++i) {
         var unicode = cidToUnicode[i];
         var width;
         if (isArray(unicode)) {
@@ -1496,12 +1787,11 @@ var Font = (function Font() {
       var url = ('url(data:' + this.mimetype + ';base64,' +
                  window.btoa(data) + ');');
       var rule = "@font-face { font-family:'" + fontName + "';src:" + url + '}';
-      var styleSheet = document.styleSheets[0];
-      if (!styleSheet) {
-        document.documentElement.firstChild.appendChild(
-          document.createElement('style'));
-        styleSheet = document.styleSheets[0];
-      }
+
+      document.documentElement.firstChild.appendChild(
+        document.createElement('style'));
+
+      var styleSheet = document.styleSheets[document.styleSheets.length - 1];
       styleSheet.insertRule(rule, styleSheet.cssRules.length);
 
       return rule;
@@ -1553,7 +1843,7 @@ var Font = (function Font() {
         }
       }
       else {
-        for (var i = 0; i < chars.length; ++i) {
+        for (var i = 0, ii = chars.length; i < ii; ++i) {
           var charcode = chars.charCodeAt(i);
           var glyph = encoding[charcode];
           if ('undefined' == typeof(glyph)) {
@@ -1711,6 +2001,7 @@ var Type1Parser = function type1Parser() {
     var charstring = [];
     var lsb = 0;
     var width = 0;
+    var flexState = 0;
 
     var value = '';
     var count = array.length;
@@ -1744,7 +2035,11 @@ var Type1Parser = function type1Parser() {
               i++;
               continue;
             }
-          } else if (!kHintingEnabled && (value == 1 || value == 2)) {
+          } else if (escape == 17 || escape == 33) {
+            // pop or setcurrentpoint commands can be ignored
+            // since we are not doing callothersubr
+            continue;
+          } else if (!kHintingEnabled && (escape == 1 || escape == 2)) {
             charstring.push('drop', 'drop', 'drop', 'drop', 'drop', 'drop');
             continue;
           }
@@ -1771,6 +2066,29 @@ var Type1Parser = function type1Parser() {
 
             charstring.push(lsb, 'hmoveto');
             continue;
+          } else if (value == 10) { // callsubr
+            if (charstring[charstring.length - 1] < 3) { // subr #0..2
+              var subrNumber = charstring.pop();
+              switch (subrNumber) {
+                case 1:
+                  flexState = 1; // prepare for flex coordinates
+                  break;
+                case 2:
+                  flexState = 2; // flex in progress
+                  break;
+                case 0:
+                  // type2 flex command does not need final coords
+                  charstring.push('exch', 'drop', 'exch', 'drop');
+                  charstring.push('flex');
+                  flexState = 0;
+                  break;
+              }
+              continue;
+            }
+          } else if (value == 21 && flexState > 0) {
+            if (flexState > 1)
+              continue; // ignoring rmoveto
+            value = 5; // first segment replacing with rlineto
           } else if (!kHintingEnabled && (value == 1 || value == 3)) {
             charstring.push('drop', 'drop');
             continue;
@@ -1823,7 +2141,7 @@ var Type1Parser = function type1Parser() {
       count++;
 
     var array = str.substr(start, count).split(' ');
-    for (var i = 0; i < array.length; i++)
+    for (var i = 0, ii = array.length; i < ii; i++)
       array[i] = parseFloat(array[i] || 0);
     return array;
   }
@@ -1848,7 +2166,7 @@ var Type1Parser = function type1Parser() {
   this.extractFontProgram = function t1_extractFontProgram(stream) {
     var eexec = decrypt(stream, kEexecEncryptionKey, 4);
     var eexecStr = '';
-    for (var i = 0; i < eexec.length; i++)
+    for (var i = 0, ii = eexec.length; i < ii; i++)
       eexecStr += String.fromCharCode(eexec[i]);
 
     var glyphsSection = false, subrsSection = false;
@@ -1972,7 +2290,7 @@ var Type1Parser = function type1Parser() {
 
   this.extractFontHeader = function t1_extractFontHeader(stream, properties) {
     var headerString = '';
-    for (var i = 0; i < stream.length; i++)
+    for (var i = 0, ii = stream.length; i < ii; i++)
       headerString += String.fromCharCode(stream[i]);
 
     var token = '';
@@ -1999,7 +2317,7 @@ var Type1Parser = function type1Parser() {
             var matrix = readNumberArray(headerString, i + 1);
 
             // The FontMatrix is in unitPerEm, so make it pixels
-            for (var j = 0; j < matrix.length; j++)
+            for (var j = 0, jj = matrix.length; j < jj; j++)
               matrix[j] *= 1000;
 
             // Make the angle into the right direction
@@ -2160,7 +2478,7 @@ CFF.prototype = {
     }
 
     for (var i = 0; i < count; i++) {
-      for (var j = 0; j < objects[i].length; j++)
+      for (var j = 0, jj = objects[i].length; j < jj; j++)
         data += isByte ? String.fromCharCode(objects[i][j] & 0xFF) :
                 objects[i][j];
     }
@@ -2188,7 +2506,7 @@ CFF.prototype = {
     var charstrings = [];
     var missings = [];
 
-    for (var i = 0; i < glyphs.length; i++) {
+    for (var i = 0, ii = glyphs.length; i < ii; i++) {
       var glyph = glyphs[i];
       var mapping = properties.glyphs[glyph.glyph];
       if (!mapping) {
@@ -2267,7 +2585,8 @@ CFF.prototype = {
     'return': 11,
     'sub': [12, 11],
     'div': [12, 12],
-    'pop': [1, 12, 18],
+    'exch': [12, 28],
+    'flex': [12, 35],
     'drop' : [12, 18],
     'endchar': 14,
     'rmoveto': 21,
@@ -2277,6 +2596,7 @@ CFF.prototype = {
   },
 
   flattenCharstring: function flattenCharstring(charstring, map) {
+    // charstring changes size - can't cache .length in loop
     for (var i = 0; i < charstring.length; i++) {
       var command = charstring[i];
       if (command.charAt) {
@@ -2321,7 +2641,7 @@ CFF.prototype = {
               '\x1c\x00\x00\x10'; // Encoding
 
           var boundingBox = properties.bbox;
-          for (var i = 0; i < boundingBox.length; i++)
+          for (var i = 0, ii = boundingBox.length; i < ii; i++)
             dict += self.encodeNumber(boundingBox[i]);
           dict += '\x05'; // FontBBox;
 
@@ -2411,7 +2731,7 @@ CFF.prototype = {
 
           if (isArray(value)) {
             data += self.encodeNumber(value[0]);
-            for (var i = 1; i < value.length; i++)
+            for (var i = 1, ii = value.length; i < ii; i++)
               data += self.encodeNumber(value[i] - value[i - 1]);
           } else {
             data += self.encodeNumber(value);
@@ -2432,7 +2752,7 @@ CFF.prototype = {
     var cff = [];
     for (var index in fields) {
       var field = fields[index];
-      for (var i = 0; i < field.length; i++)
+      for (var i = 0, ii = field.length; i < ii; i++)
         cff.push(field.charCodeAt(i));
     }
 
@@ -2484,7 +2804,7 @@ var Type2CFF = (function type2CFF() {
       var charStrings = this.parseIndex(topDict.CharStrings);
       var charset = this.parseCharsets(topDict.charset,
                                        charStrings.length, strings);
-      var hasSupplement = this.parseEncoding(topDict.Encoding, properties,
+      var encoding = this.parseEncoding(topDict.Encoding, properties,
                                              strings, charset);
 
       // The font sanitizer does not support CFF encoding with a
@@ -2492,8 +2812,8 @@ var Type2CFF = (function type2CFF() {
       // between gid to glyph, let's overwrite what is declared in
       // the top dictionary to let the sanitizer think the font use
       // StandardEncoding, that's a lie but that's ok.
-      if (hasSupplement)
-        bytes[topDict.Encoding] = 0;
+      if (encoding.hasSupplement)
+        bytes[topDict.Encoding] &= 0x7F;
 
       // The CFF specification state that the 'dotsection' command
       // (12, 0) is deprecated and treated as a no-op, but all Type2
@@ -2524,12 +2844,12 @@ var Type2CFF = (function type2CFF() {
 
       // charstrings contains info about glyphs (one element per glyph
       // containing mappings for {unicode, width})
-      var charstrings = this.getCharStrings(charset, charStrings,
+      var charstrings = this.getCharStrings(charset, encoding.encoding,
                                             privateDict, this.properties);
 
       // create the mapping between charstring and glyph id
       var glyphIds = [];
-      for (var i = 0; i < charstrings.length; i++)
+      for (var i = 0, ii = charstrings.length; i < ii; i++)
         glyphIds.push(charstrings[i].gid);
 
       this.charstrings = charstrings;
@@ -2541,45 +2861,83 @@ var Type2CFF = (function type2CFF() {
       return data;
     },
 
-    getCharStrings: function cff_charstrings(charsets, charStrings,
+    getCharStrings: function cff_charstrings(charsets, encoding,
                                              privateDict, properties) {
       var defaultWidth = privateDict['defaultWidthX'];
       var charstrings = [];
-      var differences = properties.differences;
-      var index = 0;
-      for (var i = 1; i < charsets.length; i++) {
-        var code = -1;
+      var firstChar = properties.firstChar;
+      var glyphMap = {};
+      for (var i = 0, ii = charsets.length; i < ii; i++) {
         var glyph = charsets[i];
-        for (var j = 0; j < differences.length; j++) {
-          if (differences[j] == glyph) {
-            index = j;
-            code = differences.indexOf(glyph);
-            break;
-          }
+        for (var charcode in encoding) {
+          if (encoding[charcode] == i)
+            glyphMap[glyph] = charcode | 0;
         }
+      }
 
-        var mapping = properties.glyphs[glyph] || {};
-        if (code == -1)
-          index = code = mapping.unicode || index;
+      var differences = properties.differences;
+      for (var i = 0, ii = differences.length; i < ii; ++i) {
+        var glyph = differences[i];
+        if (!glyph)
+          continue;
+        var oldGlyph = charsets[i];
+        if (oldGlyph)
+          delete glyphMap[oldGlyph];
+        glyphMap[differences[i]] = i;
+      }
 
-        if (code <= 0x1f || (code >= 127 && code <= 255))
-          code += kCmapGlyphOffset;
+      var glyphs = properties.glyphs;
+      for (var i = 1, ii = charsets.length; i < ii; i++) {
+        var glyph = charsets[i];
+        var code = glyphMap[glyph] || 0;
 
-        var width = mapping.width;
-        properties.glyphs[glyph] = properties.encoding[index] = {
-          unicode: code,
-          width: isNum(width) ? width : defaultWidth
+        var mapping = glyphs[code] || glyphs[glyph] || { width: defaultWidth };
+        var unicode = mapping.unicode;
+
+        if (unicode <= 0x1f || (unicode >= 127 && unicode <= 255))
+          unicode += kCmapGlyphOffset;
+
+        var width = (mapping.hasOwnProperty('width') && isNum(mapping.width)) ?
+                    mapping.width : defaultWidth;
+        properties.encoding[code] = {
+          unicode: unicode,
+          width: width
         };
 
         charstrings.push({
-          unicode: code,
+          unicode: unicode,
           width: width,
+          code: code,
           gid: i
         });
-        index++;
       }
 
       // sort the array by the unicode value
+      charstrings.sort(function type2CFFGetCharStringsSort(a, b) {
+        return a.unicode - b.unicode;
+      });
+
+      // remove duplicates -- they might appear during selection:
+      //   properties.glyphs[code] || properties.glyphs[glyph]
+      var nextUnusedUnicode = kCmapGlyphOffset + 0x0020;
+      var lastUnicode = charstrings[0].unicode, wasModified = false;
+      for (var i = 1, ii = charstrings.length; i < ii; ++i) {
+        if (lastUnicode != charstrings[i].unicode) {
+          lastUnicode = charstrings[i].unicode;
+          continue;
+        }
+        // duplicate found -- keeping the item that has
+        // different code and unicode, that one created
+        // as result of modification of the base encoding
+        var duplicateIndex =
+          charstrings[i].unicode == charstrings[i].code ? i : i - 1;
+        charstrings[duplicateIndex].unicode = nextUnusedUnicode++;
+        wasModified = true;
+      }
+      if (!wasModified)
+        return charstrings;
+
+      // sort the array by the unicode value (again)
       charstrings.sort(function type2CFFGetCharStringsSort(a, b) {
         return a.unicode - b.unicode;
       });
@@ -2590,6 +2948,10 @@ var Type2CFF = (function type2CFF() {
                                               charset) {
       var encoding = {};
       var bytes = this.bytes;
+      var result = {
+        encoding: encoding,
+        hasSupplement: false
+      };
 
       function readSupplement() {
         var supplementsCount = bytes[pos++];
@@ -2604,7 +2966,7 @@ var Type2CFF = (function type2CFF() {
         var gid = 1;
         var baseEncoding = pos ? Encodings.ExpertEncoding.slice() :
                                  Encodings.StandardEncoding.slice();
-        for (var i = 0; i < charset.length; i++) {
+        for (var i = 0, ii = charset.length; i < ii; i++) {
           var index = baseEncoding.indexOf(charset[i]);
           if (index != -1)
             encoding[index] = gid++;
@@ -2616,11 +2978,6 @@ var Type2CFF = (function type2CFF() {
             var glyphsCount = bytes[pos++];
             for (var i = 1; i <= glyphsCount; i++)
               encoding[bytes[pos++]] = i;
-
-            if (format & 0x80) {
-              readSupplement();
-              return true;
-            }
             break;
 
           case 1:
@@ -2632,19 +2989,18 @@ var Type2CFF = (function type2CFF() {
               for (var j = start; j <= start + count; j++)
                 encoding[j] = gid++;
             }
-
-            if (format & 0x80) {
-              readSupplement();
-              return true;
-            }
             break;
 
           default:
             error('Unknow encoding format: ' + format + ' in CFF');
             break;
         }
+        if (format & 0x80) {
+          readSupplement();
+          result.hasSupplement = true;
+        }
       }
-      return false;
+      return result;
     },
 
     parseCharsets: function cff_parsecharsets(pos, length, strings) {
@@ -2761,16 +3117,16 @@ var Type2CFF = (function type2CFF() {
     getStrings: function cff_getStrings(stringIndex) {
       function bytesToString(bytesArray) {
         var str = '';
-        for (var i = 0, length = bytesArray.length; i < length; i++)
+        for (var i = 0, ii = bytesArray.length; i < ii; i++)
           str += String.fromCharCode(bytesArray[i]);
         return str;
       }
 
       var stringArray = [];
-      for (var i = 0, length = CFFStrings.length; i < length; i++)
+      for (var i = 0, ii = CFFStrings.length; i < ii; i++)
         stringArray.push(CFFStrings[i]);
 
-      for (var i = 0, length = stringIndex.length; i < length; i++)
+      for (var i = 0, ii = stringIndex.length; i < ii; i++)
         stringArray.push(bytesToString(stringIndex.get(i).data));
 
       return stringArray;
@@ -2854,7 +3210,15 @@ var Type2CFF = (function type2CFF() {
         if (b <= 21) {
           if (b === 12) {
             ++pos;
-            var b = (b << 8) | dict[pos];
+            var op = dict[pos];
+            if ((op > 14 && op < 17) ||
+                (op > 23 && op < 30) || op > 38) {
+              warn('Invalid CFF dictionary key: ' + op);
+              // trying to replace it with initialRandomSeed
+              // to pass sanitizer
+              dict[pos] = 19;
+            }
+            var b = (b << 8) | op;
           }
           entries.push([b, operands]);
           operands = [];
@@ -2908,3 +3272,4 @@ var Type2CFF = (function type2CFF() {
 
   return constructor;
 })();
+

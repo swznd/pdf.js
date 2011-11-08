@@ -83,6 +83,21 @@
   };
 })();
 
+// Object.keys() ?
+(function checkObjectKeysCompatibility() {
+  if (typeof Object.keys !== 'undefined')
+    return;
+
+  Object.keys = function objectKeys(obj) {
+    var result = [];
+    for (var i in obj) {
+      if (obj.hasOwnProperty(i))
+        result.push(i);
+    }
+    return result;
+  };
+})();
+
 // No XMLHttpRequest.response ?
 (function checkXMLHttpRequestResponseCompatibility() {
   var xhrPrototype = XMLHttpRequest.prototype;
@@ -163,7 +178,7 @@
 
 // IE9 text/html data URI
 (function checkDocumentDocumentModeCompatibility() {
-  if (document.documentMode !== 9)
+  if (!('documentMode' in document) || document.documentMode !== 9)
     return;
   // overriding the src property
   var originalSrcDescriptor = Object.getOwnPropertyDescriptor(

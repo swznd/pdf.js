@@ -1,4 +1,4 @@
-import json, platform, os, shutil, sys, subprocess, tempfile, threading, time, urllib, urllib2
+import json, platform, os, shutil, sys, subprocess, tempfile, threading, time, urllib, urllib2, hashlib
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 import SocketServer
 from optparse import OptionParser
@@ -316,9 +316,31 @@ def downloadLinkedPDFs(manifestList):
 
             print 'done'
 
+def verifyPDFs(manifestList):
+    error = False
+    for item in manifestList:
+        f = item['file']
+        if os.access(f, os.R_OK):
+            fileMd5 = hashlib.md5(open(f, 'rb').read()).hexdigest()
+            if 'md5' not in item:
+                print 'ERROR: Missing md5 for file "' + f + '".',
+                print 'Hash for current file is "' + fileMd5 + '"'
+                error = True
+                continue
+            md5 = item['md5']
+            if fileMd5 != md5:
+                print 'ERROR: MD5 of file "' + f + '" does not match file.',
+                print 'Expected "' + md5 + '" computed "' + fileMd5 + '"'
+                error = True
+                continue
+        else:
+            print 'ERROR: Unable to open file for reading "' + f + '".'
+            error = True
+    return not error
+
 def setUp(options):
     # Only serve files from a pdf.js clone
-    assert not ANAL or os.path.isfile('../pdf.js') and os.path.isdir('../.git')
+    assert not ANAL or os.path.isfile('../src/pdf.js') and os.path.isdir('../.git')
 
     if options.masterMode and os.path.isdir(TMPDIR):
         print 'Temporary snapshot dir tmp/ is still around.'
@@ -341,6 +363,9 @@ def setUp(options):
         manifestList = json.load(mf)
 
     downloadLinkedPDFs(manifestList)
+
+    if not verifyPDFs(manifestList):
+        raise Exception('ERROR: failed to verify pdfs.')
 
     for b in testBrowsers:
         State.taskResults[b.name] = { }
@@ -435,9 +460,9 @@ def checkEq(task, results, browser, masterMode):
                 # NB: this follows the format of Mozilla reftest
                 # output so that we can reuse its reftest-analyzer
                 # script
-                print >>eqLog, 'REFTEST TEST-UNEXPECTED-FAIL |', browser +'-'+ taskId +'-page'+ str(page + 1), '| image comparison (==)'
-                print >>eqLog, 'REFTEST   IMAGE 1 (TEST):', snapshot
-                print >>eqLog, 'REFTEST   IMAGE 2 (REFERENCE):', ref
+                eqLog.write('REFTEST TEST-UNEXPECTED-FAIL | ' + browser +'-'+ taskId +'-page'+ str(page + 1) + ' | image comparison (==)\n')
+                eqLog.write('REFTEST   IMAGE 1 (TEST): ' + snapshot + '\n')
+                eqLog.write('REFTEST   IMAGE 2 (REFERENCE): ' + ref + '\n')
 
                 passed = False
                 State.numEqFailures += 1
@@ -456,7 +481,6 @@ def checkEq(task, results, browser, masterMode):
 
     if passed:
         print 'TEST-PASS | eq test', task['id'], '| in', browser
-
 
 def checkFBF(task, results, browser):
     round0, round1 = results[0], results[1]
@@ -507,17 +531,17 @@ def maybeUpdateRefImages(options, browser):
             print '  Yes!  The references in tmp/ can be synced with ref/.'
             if options.reftest:                                                                                                              
                 startReftest(browser, options)
-            if options.noPrompts or not prompt('Would you like to update the master copy in ref/?'):
-                print '  OK, not updating.'
-            else:
+            if options.noPrompts or prompt('Would you like to update the master copy in ref/?'):
                 sys.stdout.write('  Updating ref/ ... ')
 
                 # XXX unclear what to do on errors here ...
                 # NB: do *NOT* pass --delete to rsync.  That breaks this
                 # entire scheme.
-                subprocess.check_call(( 'rsync', '-arv', 'tmp/', 'ref/' ))
+                subprocess.check_call(( 'rsync', '-arvq', 'tmp/', 'ref/' ))
 
                 print 'done'
+            else:
+                print '  OK, not updating.'
 
 def startReftest(browser, options):
     url = "http://%s:%s" % (SERVER_HOST, options.port)
@@ -543,7 +567,8 @@ def runTests(options, browsers):
         teardownBrowsers(browsers)
     t2 = time.time()
     print "Runtime was", int(t2 - t1), "seconds"
-
+    if State.eqLog:
+        State.eqLog.close();
     if options.masterMode:
         maybeUpdateRefImages(options, browsers[0])
     elif options.reftest and State.numEqFailures > 0:
